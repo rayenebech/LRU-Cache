@@ -4,7 +4,7 @@
 #include <math.h>
 #include <locale.h>
 #define MAX_LENGTH 10
-
+#define MAX 100
 struct node {
   char id[MAX_LENGTH]; 
   char name[MAX_LENGTH];
@@ -31,14 +31,13 @@ void printCache(node* head);
 int sreach_in_hash_table(int id, hash_table* array, int m);
 void print_hash_table(hash_table* harray, int array_size);
 int readFile(node* newPerson,char TC[MAX_LENGTH]);
-void increment_order(hash_table* array, int array_size);
+void increment_order(hash_table* array, int array_size, int limit);
 char* cache_delete_last(node* cache_head);
 void delete_from_harray(int id_deleted,hash_table* array, int array_size);
 node* add_first_node(node* cache_head,node* newPerson);
 
 int main() {
 	setlocale(LC_ALL, "Turkish");
-	printf("Merhaba, Dünya!");
 	node* cache_head = NULL; 
 	hash_table* harray;
 	int i,cache_size, array_size;
@@ -50,7 +49,6 @@ int main() {
 		harray[i].id= -1;
 		harray[i].reserved=0;
 	}
-	printf("\nPrinting hash table: \n");
 	print_hash_table(harray,array_size);
 	while(1==1){
 		cache_head = user_interface(cache_head,&cache_size,array_size,harray);
@@ -73,8 +71,19 @@ node* user_interface(node* cache_head, int* cache_left, int array_size, hash_tab
 	if (index == -1){
 		return;
 	}
-	else if(array[index].id == -1 || array[index].reserved == 0){
-		printf("\nValue does not exist in the hash table so we will add it to both the cache and the table\n ");
+	if(array[index].id == id && array[index].reserved){
+			/*Value exists so read it and update it*/
+			printf("The value already exists, reading from cache: \n");
+			readCache(&cache_head,array[index].order);
+			if(array[index].order !=0){
+				increment_order(array,array_size,array[index].order);
+				array[index].order= 0;
+			}
+			print_hash_table(array,array_size);
+			printCache(cache_head);
+	
+	}
+	else{
 		/*Create a new node*/
 		newPerson = (node*) malloc(sizeof(node));
 		newPerson->next= NULL;
@@ -83,7 +92,21 @@ node* user_interface(node* cache_head, int* cache_left, int array_size, hash_tab
 		}
 		printf("\nInformation of the newPerson: \n");
 		printf("%s, %s, %s, %d, %s",newPerson->id,newPerson->name,newPerson->surname, newPerson->birth_year,newPerson->address);
-		printf("\nNow let's add it to the cache \n");
+		printf("\nThis Id does not exist in the hash cache ");
+		if(array[index].id == id && !array[index].reserved){
+			printf("because it was deleted");
+		}
+		else if(array[index].id == -1){
+			printf("neither in the table\n");
+			/*add at at index for the hash table*/			
+		}
+		/*Update the hash table*/
+		increment_order(array,array_size,MAX);
+		array[index].id= id;
+		strcpy(array[index].TC,TC);
+		array[index].order= 0;
+		array[index].reserved=1;
+		print_hash_table(array,array_size);
 		/*check if the cache is full*/
 		if(*cache_left == 0){
 			printf("\nThe cache is full so delete the last one");
@@ -97,49 +120,22 @@ node* user_interface(node* cache_head, int* cache_left, int array_size, hash_tab
 			delete_from_harray(id_deleted,array,array_size);
 		}
 		else{
-			printf("\nChache is not full and its size now is: %d",*cache_left);
 			*cache_left = *cache_left -1;
 		}
 		/*add at begining of the cache */ 
-		printf("\nAdd at the begining of the cache:\n");
 		cache_head= add_first_node(cache_head,newPerson);
-		printCache(cache_head);
-		/*add at at index for the hash table*/
-		increment_order(array,array_size);
-		array[index].id= id;
-		strcpy(array[index].TC,TC);
-		array[index].order= 0;
-		array[index].reserved=1;
-		print_hash_table(array,array_size);
-				
-	}
-	else if(array[index].id == id ){
-		printf("The value already exists, reading from cache: \n");
-		if(array[index].reserved){
-			/*Value exists so read it and update it*/
-
-			readCache(&cache_head,array[index].order);
-			if(array[index].order !=0){
-				increment_order(array,array_size);
-				array[index].order= 0;
-			}
-			printf("\nUpdating the hashtable: \n");
-			print_hash_table(array,array_size);
-			printf("\nUpdating the cache:\n");
-			printCache(cache_head);
-		}
-		else{
-			/*value was deleted so insert it again?*/
-		}
-		
-	}
+		printCache(cache_head);		
+	} 
 	return cache_head;
 
 }
-void increment_order(hash_table* array, int array_size){
+void increment_order(hash_table* array, int array_size,int limit){
 	int i;
 	for(i=0;i<array_size;i++){
-		array[i].order ++;
+		if(array[i].order<limit && array[i].reserved){
+			array[i].order ++;
+		}
+		
 	}
 }
 char* cache_delete_last(node* cache_head){
@@ -170,11 +166,9 @@ void delete_from_harray(int id_deleted,hash_table* array, int array_size){
 }
 node*  add_first_node(node* cache_head,node* newPerson){
 	if(cache_head == NULL){
-		printf("\ncache is empty so newPerson will be the head\n");
 		cache_head= newPerson;
 		return cache_head;
 	}
-	printf("\nCache is not empty\n");
 	node *p = cache_head->next; 
 	newPerson->next= cache_head;
 	(newPerson->next)->next= p;
@@ -225,11 +219,11 @@ int horner(char str[MAX_LENGTH]){
 }
 
 int sreach_in_hash_table(int id, hash_table* array, int m){
-	int i=0,j, h1, h2;
+	int i=0,j,k, h1, h2;
 	h1 = id % m;
 	/*for i=0 j = h1*/
 	j=h1;
-	while(i<m && array[j].id != id && array[j].id != -1 && array[j].id != id){
+	while(i<m && array[j].id != id && array[j].id != -1 && array[j].reserved){
 		h2 = 1 + (id % (m-1));
 		j = (h1 + i * h2) %m;
 		i++;
@@ -237,6 +231,22 @@ int sreach_in_hash_table(int id, hash_table* array, int m){
 	if(i==m){
 		printf("Value does not exist and hashtable is full");
 		return -1;
+	}
+	else if (array[j].id != id && array[j].id != -1 && !array[j].reserved){
+		/*Another value has been deleted. So may be we can overwrite it.
+		But make sure thr true id is not after it so keep searching*/
+		k=j;
+		while(i<m && array[k].id != id && array[k].id != -1 ){
+			h2 = 1 + (id % (m-1));
+			k = (h1 + i * h2) %m;
+			i++;
+		}
+		if(array[k].id == id){
+			return k;
+		}
+		else{
+			return j;
+		}
 	}
 	else{
 		return j;
@@ -256,6 +266,7 @@ int findSize(int N){
 }
 void print_hash_table(hash_table* harray, int array_size){
 	int i;
+	printf("\nPrinting Hashtable:\n");
 	printf("TC | order | reserved\n");
 	for(i=0;i<array_size;i++){
 		printf("%s |%d | %d\n",harray[i].TC, harray[i].order, harray[i].reserved);
